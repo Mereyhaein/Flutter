@@ -12,7 +12,7 @@ class Geo {
   }
 
   Map<String, dynamic> toJson() {
-    return {'lat': lat.toString(), 'lng': lng.toString()};
+    return <String, dynamic>{'lat': lat.toString(), 'lng': lng.toString()};
   }
 }
 
@@ -42,7 +42,7 @@ class Address {
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    return <String, dynamic>{
       'street': street,
       'suite': suite,
       'city': city,
@@ -71,14 +71,11 @@ class User {
   final String phone;
   final String? website;
   final Address address;
+
   final ({String name, String catchPhrase}) company;
 
-  String get phoneDigits {
-    return phone.replaceAll(RegExp(r'[^0-9+]'), '');
-  }
-
   factory User.fromJson(Map<String, dynamic> json) {
-    final companyJson = json['company'] as Map<String, dynamic>;
+    final companyMap = json['company'] as Map<String, dynamic>;
 
     return User(
       id: json['id'] as int,
@@ -89,14 +86,14 @@ class User {
       website: json['website'] as String?,
       address: Address.fromJson(json['address'] as Map<String, dynamic>),
       company: (
-        name: companyJson['name'] as String,
-        catchPhrase: companyJson['catchPhrase'] as String,
+        name: companyMap['name'] as String,
+        catchPhrase: companyMap['catchPhrase'] as String,
       ),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    return <String, dynamic>{
       'id': id,
       'name': name,
       'username': username,
@@ -104,8 +101,15 @@ class User {
       'phone': phone,
       'website': website,
       'address': address.toJson(),
-      'company': {'name': company.name, 'catchPhrase': company.catchPhrase},
+      'company': <String, dynamic>{
+        'name': company.name,
+        'catchPhrase': company.catchPhrase,
+      },
     };
+  }
+
+  String get phoneDigits {
+    return phone.replaceAll(RegExp(r'[^0-9+]'), '');
   }
 
   @override
@@ -118,6 +122,6 @@ class User {
 
   @override
   String toString() {
-    return 'User(id: $id, name: $name, email: $email)';
+    return 'User(id: $id, name: $name)';
   }
 }

@@ -1,5 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../auth/auth_model.dart';
 import 'user.dart';
 
 class UserDetailScreen extends StatelessWidget {
@@ -7,119 +12,136 @@ class UserDetailScreen extends StatelessWidget {
 
   final User user;
 
+  Future<void> _open(BuildContext context, Uri uri) async {
+    try {
+      final launched = await launchUrl(uri);
+
+      if (!context.mounted) return;
+
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No app can open this link')),
+        );
+      }
+    } catch (error) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Cannot open link: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final website = user.website;
+
     return Scaffold(
       appBar: AppBar(title: Text(user.name)),
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: [
-          Center(
-            child: CircleAvatar(
-              radius: 40,
-              child: Text(
-                user.name.isEmpty ? '?' : user.name[0].toUpperCase(),
-                style: const TextStyle(fontSize: 30),
-              ),
-            ),
+        children: <Widget>[
+          CircleAvatar(
+            radius: 36,
+            child: Text(user.name.isEmpty ? '?' : user.name[0]),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          Text(
-            'Personal information',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('ID: ${user.id}'),
 
-          const SizedBox(height: 12),
+          ListTile(title: const Text('Name'), subtitle: Text(user.name)),
 
           ListTile(
-            leading: const Icon(Icons.badge),
-            title: const Text('ID'),
-            subtitle: Text('${user.id}'),
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.person),
-            title: const Text('Name'),
-            subtitle: Text(user.name),
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.account_circle),
             title: const Text('Username'),
             subtitle: Text(user.username),
           ),
 
           ListTile(
-            leading: const Icon(Icons.email),
             title: const Text('Email'),
             subtitle: Text(user.email),
+            trailing: const Icon(Icons.email_outlined),
+            onTap: () =>
+                _open(context, Uri(scheme: 'mailto', path: user.email)),
           ),
 
           ListTile(
-            leading: const Icon(Icons.phone),
             title: const Text('Phone'),
-            subtitle: Text(user.phone),
-            onTap: () {},
+            subtitle: Text(user.phone.isEmpty ? 'Not provided' : user.phone),
+            trailing: const Icon(Icons.call_outlined),
+            onTap: user.phoneDigits.isEmpty
+                ? null
+                : () => _open(
+                    context,
+                    Uri(scheme: 'tel', path: user.phoneDigits),
+                  ),
+          ),
+
+          if (website != null && website.isNotEmpty)
+            ListTile(
+              title: const Text('Website'),
+              subtitle: Text(website),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => _open(
+                context,
+                Uri.parse(
+                  website.startsWith('https://') ||
+                          website.startsWith('http://')
+                      ? website
+                      : 'https://$website',
+                ),
+              ),
+            ),
+
+          const Divider(),
+
+          ListTile(
+            title: const Text('Address'),
+            subtitle: Text(
+              '${user.address.street}, '
+              '${user.address.suite}\n'
+              '${user.address.city}, '
+              '${user.address.zipcode}\n'
+              'Geo: ${user.address.geo.lat}, '
+              '${user.address.geo.lng}',
+            ),
           ),
 
           ListTile(
-            leading: const Icon(Icons.language),
-            title: const Text('Website'),
-            subtitle: Text(user.website ?? 'Not available'),
-            onTap: () {},
+            title: const Text('Company'),
+            subtitle: Text(
+              '${user.company.name}\n'
+              '${user.company.catchPhrase}',
+            ),
           ),
 
-          const Divider(height: 32),
+          if (kDebugMode)
+            OutlinedButton.icon(
+              onPressed: () async {
+                final token = await context
+                    .read<AuthModel>()
+                    .readTokenForDebug();
 
-          Text('Address', style: Theme.of(context).textTheme.titleLarge),
+                if (!context.mounted) return;
 
-          ListTile(
-            title: const Text('Street'),
-            subtitle: Text(user.address.street),
-          ),
+                if (token == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No debug token available')),
+                  );
 
-          ListTile(
-            title: const Text('Suite'),
-            subtitle: Text(user.address.suite),
-          ),
+                  return;
+                }
 
-          ListTile(
-            title: const Text('City'),
-            subtitle: Text(user.address.city),
-          ),
+                await Clipboard.setData(ClipboardData(text: token));
 
-          ListTile(
-            title: const Text('Zipcode'),
-            subtitle: Text(user.address.zipcode),
-          ),
+                if (!context.mounted) return;
 
-          ListTile(
-            title: const Text('Latitude'),
-            subtitle: Text('${user.address.geo.lat}'),
-          ),
-
-          ListTile(
-            title: const Text('Longitude'),
-            subtitle: Text('${user.address.geo.lng}'),
-          ),
-
-          const Divider(height: 32),
-
-          Text('Company', style: Theme.of(context).textTheme.titleLarge),
-
-          ListTile(
-            title: const Text('Company name'),
-            subtitle: Text(user.company.name),
-          ),
-
-          ListTile(
-            title: const Text('Catch phrase'),
-            subtitle: Text(user.company.catchPhrase),
-          ),
-
-          const SizedBox(height: 24),
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Debug token copied')),
+                );
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy token (debug only)'),
+            ),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_exception.dart';
+
 import 'user.dart';
 import 'users_model.dart';
 
@@ -9,71 +10,31 @@ class NewUserScreen extends StatefulWidget {
   const NewUserScreen({super.key});
 
   @override
-  State<NewUserScreen> createState() => _NewUserScreenState();
+  State<NewUserScreen> createState() {
+    return _NewUserScreenState();
+  }
 }
 
 class _NewUserScreenState extends State<NewUserScreen> {
-  final _formKey = GlobalKey<FormState>();
+  final _key = GlobalKey<FormState>();
 
-  final _nameController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _name = TextEditingController();
+  final _username = TextEditingController();
+  final _email = TextEditingController();
 
   bool _saving = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _usernameController.dispose();
-    _emailController.dispose();
+    _name.dispose();
+    _username.dispose();
+    _email.dispose();
 
     super.dispose();
   }
 
-  String? _validateName(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Name is required';
-    }
-
-    if (value.trim().length < 2) {
-      return 'Name must have at least 2 characters';
-    }
-
-    return null;
-  }
-
-  String? _validateUsername(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Username is required';
-    }
-
-    if (value.trim().length < 3) {
-      return 'Username must have at least 3 characters';
-    }
-
-    return null;
-  }
-
-  String? _validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Email is required';
-    }
-
-    final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-
-    if (!emailPattern.hasMatch(value.trim())) {
-      return 'Enter a valid email';
-    }
-
-    return null;
-  }
-
   Future<void> _save() async {
-    if (_saving) return;
-
-    final form = _formKey.currentState;
-
-    if (form == null || !form.validate()) {
+    if (_saving || !(_key.currentState?.validate() ?? false)) {
       return;
     }
 
@@ -81,13 +42,11 @@ class _NewUserScreenState extends State<NewUserScreen> {
       _saving = true;
     });
 
-    final model = context.read<UsersModel>();
-
     final draft = User(
       id: 0,
-      name: _nameController.text.trim(),
-      username: _usernameController.text.trim(),
-      email: _emailController.text.trim(),
+      name: _name.text.trim(),
+      username: _username.text.trim(),
+      email: _email.text.trim(),
       phone: '',
       website: null,
       address: const Address(
@@ -101,30 +60,27 @@ class _NewUserScreenState extends State<NewUserScreen> {
     );
 
     try {
-      await model.create(draft);
+      await context.read<UsersModel>().create(draft);
 
       if (!mounted) return;
 
-      Navigator.pop(context);
-    } on ApiException catch (e) {
+      Navigator.of(context).pop();
+    } on ApiException catch (error) {
       if (!mounted) return;
-
-      final message = switch (e) {
-        NoConnectionException() => 'No internet connection',
-
-        ServerException(:final status) => 'Server error: $status',
-
-        UnauthorizedException() => 'Unauthorized request',
-
-        NotFoundException() => 'Endpoint not found',
-
-        BadResponseException(:final detail) =>
-          detail ?? 'Invalid server response',
-      };
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(
+            'Could not save: '
+            '${error.runtimeType}',
+          ),
+        ),
       );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Save failed: $error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -138,62 +94,66 @@ class _NewUserScreenState extends State<NewUserScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('New user')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _nameController,
-              enabled: !_saving,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(18),
+        child: Form(
+          key: _key,
+          child: Column(
+            children: <Widget>[
+              TextFormField(
+                controller: _name,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) =>
+                    (value?.trim().isEmpty ?? true) ? 'Name is required' : null,
               ),
-              validator: _validateName,
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-            TextFormField(
-              controller: _usernameController,
-              enabled: !_saving,
-              decoration: const InputDecoration(
-                labelText: 'Username',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.account_circle),
+              TextFormField(
+                controller: _username,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) => (value?.trim().isEmpty ?? true)
+                    ? 'Username is required'
+                    : null,
               ),
-              validator: _validateUsername,
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-            TextFormField(
-              controller: _emailController,
-              enabled: !_saving,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email),
+              TextFormField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  final email = value?.trim() ?? '';
+
+                  if (!email.contains('@') || !email.contains('.')) {
+                    return 'Enter a valid email';
+                  }
+
+                  return null;
+                },
               ),
-              validator: _validateEmail,
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-            ElevatedButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Save'),
-            ),
-          ],
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: Text(_saving ? 'Saving...' : 'Save'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

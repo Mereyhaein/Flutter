@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/api/api_exception.dart';
+
 import 'user.dart';
 import 'user_repository.dart';
 
@@ -9,15 +10,20 @@ class UsersModel extends ChangeNotifier {
 
   final UserRepository _repo;
 
-  List<User> items = const [];
+  List<User> items = const <User>[];
 
   ApiException? error;
 
   bool loading = false;
   bool saving = false;
+  bool fromCache = false;
+
+  bool _disposed = false;
 
   Future<void> load() async {
-    if (loading) return;
+    if (loading || _disposed) {
+      return;
+    }
 
     loading = true;
     error = null;
@@ -25,12 +31,21 @@ class UsersModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      items = await _repo.getAll();
-    } on ApiException catch (e) {
-      error = e;
+      final result = await _repo.getAll();
+
+      if (_disposed) return;
+
+      items = result.items;
+      fromCache = result.fromCache;
+    } on ApiException catch (exception) {
+      if (_disposed) return;
+
+      error = exception;
     } finally {
-      loading = false;
-      notifyListeners();
+      if (!_disposed) {
+        loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -43,26 +58,29 @@ class UsersModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final createdUser = await _repo.create(draft);
+      final created = await _repo.create(draft);
 
-      items = [createdUser, ...items];
+      if (!_disposed) {
+        items = <User>[created, ...items];
 
-      notifyListeners();
+        notifyListeners();
+      }
 
-      return createdUser;
+      return created;
     } finally {
-      saving = false;
-      notifyListeners();
+      if (!_disposed) {
+        saving = false;
+        notifyListeners();
+      }
     }
-  }
-
-  Future<User> getById(int id) {
-    return _repo.getById(id);
   }
 
   @override
   void dispose() {
+    _disposed = true;
+
     _repo.dispose();
+
     super.dispose();
   }
 }
